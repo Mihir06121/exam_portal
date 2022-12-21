@@ -11,6 +11,8 @@ const AdminDashboard = () => {
     const [values, setValues] = useState({
         courseName: "",
         courseType: "",
+        examDurationMin: "",
+        coursePrice: "",
         error: "",
         errorMessage: "",
         refresh: false
@@ -18,7 +20,7 @@ const AdminDashboard = () => {
 
     const [courses, setCources] = useState([])
 
-    const {courseName, courseType, error, errorMessage, refresh} = values
+    const {courseName, courseType, examDurationMin, coursePrice, error, errorMessage, refresh} = values
 
     useEffect(() => {
         getCourses().then(res => {
@@ -30,7 +32,7 @@ const AdminDashboard = () => {
         setValues({...values, errorMessage: "", error: '', [name]: event.target.value})
     }
 
-    const handleSubmit = (data = {courseName, courseType}) => {
+    const handleSubmit = (data = {courseName, courseType, examDurationMin, coursePrice}) => {
         if (courseName === '' || courseType === '') {
             setValues({...values, error: "All Fields are required"})
         } else {
@@ -72,7 +74,9 @@ const AdminDashboard = () => {
                             {courses.map((c, i) => (
                                 <ul key={i}>
                                     <li><div><h5>{c.courseName}</h5></div>
-                                    <div>{c.courseType}</div></li>
+                                    <div>{c.courseType}</div>
+                                    <div>Exam Duration: {c.examDuration/60} minutes</div>
+                                    <div>course Price: Rs{c.coursePrice}</div></li>
                                 </ul>
                             ))}
                         </div> : <div className="text-center">No Courses</div>}
@@ -113,10 +117,36 @@ const AdminDashboard = () => {
                                 </Select>
                                 </FormControl>
                             </div>
+                            <div className="form-group py-2">
+                                <TextField 
+                                className="w-100"
+                                    error={error === "" ? false : true}
+                                    id="standard-basic" 
+                                    type="test"
+                                    label={error === '' ? "Exam Duration (in minutes)" : error} 
+                                    value={examDurationMin}
+                                    required={true}
+                                    variant="standard" 
+                                    onChange={handleChange('examDurationMin')}
+                                />
+                            </div>
+                            <div className="form-group py-2">
+                                <TextField 
+                                className="w-100"
+                                    error={error === "" ? false : true}
+                                    id="standard-basic" 
+                                    type="test"
+                                    label={error === '' ? "Cource Price" : error} 
+                                    value={coursePrice}
+                                    required={true}
+                                    variant="standard" 
+                                    onChange={handleChange('coursePrice')}
+                                />
+                            </div>
                         </form>
                         <div>
                             <button
-                            onClick={() => handleSubmit({courseName, courseType})}
+                            onClick={() => handleSubmit({courseName, courseType, examDuration: examDurationMin*60, coursePrice})}
                             className="btn btn-outline-primary col-12">Create Course</button>
                         </div>
                         <div>

@@ -13,6 +13,7 @@ import Select from '@mui/material/Select';
 import InputLabel from '@mui/material/InputLabel';
 import MenuItem from '@mui/material/MenuItem';
 import Collapse from '@mui/material/Collapse';
+import axios from 'axios'
 
 const CenterInfo = () => {
 
@@ -26,10 +27,10 @@ const CenterInfo = () => {
     const [openRegister, setOpenRegister] = useState(false)
     const [courses, setCources] = useState([])
     const [viewStudent, setViewStudent] = useState({})
+    const [viewCourse, setViewCourse] = useState({})
     useEffect(() => {
         getUserCenter(user._id).then(res => {
             setCenter(res)
-            console.log(res)
             getCenterStudents(res._id).then(res => {
                 setStudents(res.reverse())
             })
@@ -57,6 +58,7 @@ const CenterInfo = () => {
         twelfthMarsheet:{},
         graduationCertificate:{},
         selectedCourse:'',
+        newCourse: '',
         email: 'student1@gmail.com ',
         password: '12345678',
         error: '',
@@ -71,6 +73,7 @@ const CenterInfo = () => {
         cityName,
         adhaarCard,
         panCard,
+        newCourse,
         tenthMarkSheet,
         twelfthMarsheet,
         graduationCertificate,
@@ -87,7 +90,7 @@ const CenterInfo = () => {
         graduationCertificate,
         selectedCourse,
         mobileNumber, email, password, registeredBy, role}) => {
-        console.log(data)
+        // console.log(data)
         if (pattern.test(data.mobileNumber)) {
             registerStudent(data).then(res => {
                 if (res.error) {
@@ -105,21 +108,73 @@ const CenterInfo = () => {
     }
 
     const submitStudentSubscribe = (data) => {
-        console.log(data.studentId, data.registeredId)
-            subscribeStudent(data).then(res => {
-                // console.log(res)
-                if (res.updated === true) {
-                    return setRefresh(true)
-                }
-            }).catch(err => {
-                console.log(err)
-            })
-            setRefresh(false)
+        subscribeStudent(data).then(res => {
+            if (res.updated === true) {
+                return setRefresh(true)
+            }
+        }).catch(err => {
+            console.log(err)
+        })
+        setRefresh(false)
     }
     
     const handleChange = name => event => {
         return setValues({ ...values, error: '', submitError: '', [name]: event.target.value}), setRefresh(false), setExistingStudent(null)
     };
+
+    const updateCourse = (data) => {
+        fetch(`http://localhost:8000/api/update-student-course`, {
+            method: 'PATCH',
+            headers: {
+                Accept: 'application/json',
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(data)
+        }).then(response => {
+            response.json()
+            setValues({...values, newCourse: ''})
+            setRefresh(true)
+        }).catch(err => {
+            console.log(err)
+        })
+        setRefresh(false)
+        setOpen(false)
+    }
+
+    const initPayment = ({data, studentId}) => {
+		const options = {
+			key: "rzp_live_TPipRj2vY83lcg",
+			amount: data.amount,
+			currency: data.currency,
+			description: "Test Transaction",
+			order_id: data.id,
+			handler: async (response) => {
+				try {
+					const verifyUrl = `http://localhost:8000/api/payment/verify/${studentId}`;
+					const { data } = await axios.post(verifyUrl, response);
+					console.log("VERIFIED", data);
+				} catch (error) {
+					console.log(error);
+				}
+			},
+			theme: {
+				color: "#3399cc",
+			},
+		};
+		const rzp1 = new window.Razorpay(options);
+		rzp1.open();
+    }
+
+    const handlePayment = async (price, studentId) => {
+		try {
+			const orderUrl = "http://localhost:8000/api/payment/orders";
+			const { data } = await axios.post(orderUrl, { amount: price });
+			console.log(data);
+			initPayment({data: data.data, studentId});
+		} catch (error) {
+			console.log(error);
+		}
+	};
 
     const displayStudents = () => {
         if (students.length !== 0) {
@@ -128,28 +183,29 @@ const CenterInfo = () => {
                 <table className="table table-borderless">
                     <thead>
                         <tr className="border-bottom border-dark">
-                            <th scope="col">First Name</th>
-                            <th scope="col">Middle Name</th>
-                            <th scope="col">Last Name</th>
+                            <th scope="col">Name</th>
                             <th scope="col">E-mail</th>
+                            <th scope="col">Course</th>
                             <th scope="col">Status</th>
                         </tr>
                     </thead>
                         {students.map((stu, i) => (
                         <tbody key={i} className="border-bottom border-dark">
                             <tr className='m-3' style={stu.isSubscribed === true ? {backgroundColor:"green"} : {backgroundColor:"red"}}>
-                                <td>{stu.firstName}</td>
-                                <td>{stu.middleName}</td>
-                                <td>{stu.lastName}</td>
+                                <td>{stu.firstName} {stu.lastName}</td>
                                 <td>{stu.email}</td>
+                                <td>{stu.selectedCourse.courseName} / Rs.{stu.selectedCourse.coursePrice}</td>
                                 <td className="">
-                                    {stu.isSubscribed === false ? <span className="">Not Subscribed</span> : <span className="">Subscribed</span>}
+                                    {stu.isSubscribed === false ? 
+                                    <button onClick={() => {
+                                        // submitStudentSubscribe({ studentId: stu._id, registeredId: stu.registeredBy})
+                                        handlePayment(stu.selectedCourse.coursePrice, stu._id)
+                                    }} className="btn btn-sm btn-outline-warning">Subscribe</button>
+                                    : <span className="">Subscribed</span>}
                                 </td> 
                                 <td>
-                                    <button onClick={() => submitStudentSubscribe({studentId: stu._id, registeredId: stu.registeredBy})} className="btn btn-sm btn-outline-warning">Subscribe</button>
-                                </td>
-                                <td>
                                     <button onClick={() => {setViewStudent(stu)
+                                    setViewCourse(stu.selectedCourse)
                                     setOpen(true)}} className="btn btn-sm btn-outline-warning">View Student</button>
                                 </td>
                             </tr>
@@ -161,7 +217,70 @@ const CenterInfo = () => {
                 </div>
         }
     }
+    function isDate(val) {
+        // Cross realm comptatible
+        return Object.prototype.toString.call(val) === '[object Date]'
+      }
+      
+      function isObj(val) {
+        return typeof val === 'object'
+      }
+      
+       function stringifyValue(val) {
+        if (isObj(val) && !isDate(val)) {
+          return JSON.stringify(val)
+        } else {
+          return val
+        }
+      }
+      
+      function buildForm({ action, params }) {
+        const form = document.createElement('form')
+        form.setAttribute('method', 'post')
+        form.setAttribute('action', action)
+      
+        Object.keys(params).forEach(key => {
+          const input = document.createElement('input')
+          input.setAttribute('type', 'hidden')
+          input.setAttribute('name', key)
+          input.setAttribute('value', stringifyValue(params[key]))
+          form.appendChild(input)
+        })
+      
+        return form
+      }
+      
+       function post(details) {
+        const form = buildForm(details)
+        // console.log(form)
+        document.body.appendChild(form)
+        form.submit()
+        form.remove()
+      }
 
+    const buy = (data) => {
+            const orderData = {
+                transaction_id: 'demo_transaction_id',
+                amount: 1,
+                values: values,
+                paymentStatus: false,
+            }
+
+            subscribeStudent(data).then(res => {
+                console.log("RESPONSE",res)
+                let info = {
+                    action: "https://securegw-stage.paytm.in/order/process",
+                    params: res
+                }
+                post(info).then(respo => {
+                    console.log(respo)
+                })
+
+            })
+            .catch(err => {
+                // console.log(err)
+            })
+    }
     return (
         <UserIndex>
             <div className="p-2 d-flex justify-content-center align-items-center">
@@ -394,6 +513,33 @@ const CenterInfo = () => {
                         <h4>Name: {viewStudent.firstName} {viewStudent.middleName} {viewStudent.lastName}</h4>
                         <h4>Email: {viewStudent.email}</h4>
                         <h4>Mobile No.: {viewStudent.mobileNumber}</h4>
+                        <h4>Course Selected: {viewCourse.courseName}</h4>
+                        {viewStudent.isSubscribed === false ? 
+                        <div>
+                        <div className="form-group py-2">
+                            <FormControl sx={{minWidth: '100%' }} size="small">
+                                <InputLabel id="demo-select-small">Select Course</InputLabel>
+                                <Select
+                                    labelId="demo-select-small"
+                                    id="demo-select-small"
+                                    value={newCourse}
+                                    label="Select Course"
+                                    onChange={handleChange('newCourse')}
+                                >
+                                    <MenuItem value="none">
+                                    <em>None</em>
+                                    </MenuItem>
+                                    {courses.length !== 0 ? (
+                                        courses.map((c, i) => (
+                                            <MenuItem key={i} value={c._id}>{c.courseName}</MenuItem>
+                                        ))
+                                    ) : null}
+                                </Select>
+                            </FormControl>
+                        </div>
+                        <div align="center" className="py-3">
+                            <button onClick={() => updateCourse({studentId: viewStudent._id, newCourse})} className="btn btn-sm btn-outline-warning col-6">Update Course</button>
+                        </div></div>: null}
                         <button onClick={() => setOpen(false)} className="btn btn-sm btn-outline-danger col-12">Close</button>
                     </Collapse>
                 </div>

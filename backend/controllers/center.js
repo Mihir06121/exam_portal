@@ -1,8 +1,15 @@
+const sgMail = require('@sendgrid/mail');
 const Center = require('../models/center')
+sgMail.setApiKey('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')
 const User = require('../models/users')
 const Student = require('../models/students')
 const CenterUser = require('../models/centerUser')
 const Course = require('../models/course')
+const PaytmChecksum = require('paytmchecksum')
+const { v4: uuidv4 } = require('uuid')
+const Razorpay = require("razorpay");
+const crypto = require("crypto");
+
 exports.createCenter = (req, res) => {
     console.log(req.body)
     Center.findOne({assignedTo: req.body.assignedTo}).exec((err, success) => {
@@ -23,6 +30,13 @@ exports.createCenter = (req, res) => {
                                 error: "Something went wrong."
                             })
                         } else {
+                            const createCenterEmail = { to: 'mp06121@gmail.com', 
+                            from: 'mp06121@gmail.com',
+                            subject: `A new center is allocated to ${success.ownerName}`,
+                            html:`<p>A new center is created`}
+                            // sgMail.send(createCenterEmail)
+                            // .then(sent =>  console.log('SENT >>>', sent)) 
+                            // .catch(err =>  console.log('ERR >>>', err)); 
                             res.json({newCenter,
                             message: "Updated Successfully"})
                         }
@@ -228,22 +242,123 @@ exports.registerStudent = (req, res) => {
 exports.getCenterStudents = (req, res) => {
     const {centerId} = req.params
     console.log(centerId)
-    Student.find({registeredBy: centerId}).exec((err, students) => {
+    Student.find({registeredBy: centerId})
+    .populate({ path: 'selectedCourse', model: Course })
+    .exec((err, students) => {
         if (err || !students) {
             return res.send({
                 message: "Students not found",
                 err
             })
         } else {
-            console.log("CENTER STUDENTS", students)
+            // console.log("CENTER STUDENTS", students)
             res.json(students)
         }
     })
 }
 
-exports.subscribeStudent = (req, res) => {
+exports.getResponse = (req, res) => {
     const {studentId, registeredId} = req.body
-    Student.findByIdAndUpdate(studentId, {$set: {isSubscribed: true}}, {new: true}).exec((err, success) => {
+    let paytmChecksumHash = req.body.CHECKSUMHASH;
+    console.log(req.body)
+    delete req.body.CHECKSUMHASH;
+    var isVerifySignature = PaytmChecksum.verifySignature(JSON.stringify(req.body), process.env.TEST_MERCHANT_KEY_P, paytmChecksumHash);
+    if (isVerifySignature) {
+
+        var paytmParams = {};
+        paytmParams["MID"] = req.body.MID;
+        paytmParams["ORDERID"] = req.body.ORDERID;
+
+        /*
+         * Generate checksum by parameters we have
+         * Find your Merchant Key in your Paytm Dashboard at https://dashboard.paytm.com/next/apikeys 
+         */
+        PaytmChecksum.generateSignature(paytmParams, process.env.TEST_MERCHANT_KEY_P).then(function(checksum) {
+
+            paytmParams["CHECKSUMHASH"] = checksum;
+
+            var post_data = JSON.stringify(paytmParams);
+
+            var options = {
+
+                /* for Staging */
+                // hostname: 'securegw-stage.paytm.in',
+
+                /* for Production */
+                hostname: 'securegw.paytm.in',
+
+                port: 443,
+                path: '/order/status',
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Content-Length': post_data.length
+                }
+            };
+
+            var response = "";
+            var post_req = https.request(options, function(post_res) {
+                post_res.on('data', function(chunk) {
+                    response += chunk;
+                });
+
+                post_res.on('end', function() {
+                    let result = JSON.parse(response)
+                    if (result.STATUS === 'TXN_SUCCESS') {
+                        // console.log("TRANSACTION SUCCESS")
+                        Student.findByIdAndUpdate(studentId, {$set: {isSubscribed: true}}, {new: true}).exec((err, success) => {
+                            if (err || !success) {
+                                res.send({
+                                    message: "Something went wrong. Can't update Please try again",
+                                    err
+                                })
+                            }
+                            res.send({
+                                updated: true,
+                                success
+                            })
+                        }) 
+                    }
+                    // {
+                    //     //store in db
+                    //     db.collection('payments').doc('mPDd5z0pNiInbSIIotfj').update({paymentHistory:firebase.firestore.FieldValue.arrayUnion(result)})
+                    //     .then(()=>// console.log("Update success"))
+                    //     .catch(()=>// console.log("Unable to update"))
+                    // }
+
+                    // Order.updateOne({ _id: fields.ORDERID }, {
+                    //     $set: {
+                    //         status: req.body.status
+                    //     }
+                    // }, (err, order) => {
+                    //     if (err) {
+                    //         // console.log(err)
+                    //         return res.status(400).json({
+                    //             error: err
+                    //         });
+                    //     }
+                    //     res.json(order)
+                    // })
+
+
+
+                    // res.redirect(`https://muskanlabel.com/user/dashboard`)
+                    res.redirect(`http://localhost:3000/user/center-info`)
+
+
+                });
+            });
+
+            post_req.write(post_data);
+            post_req.end();
+        });
+    } else {
+        console.log("Checksum Mismatched");
+    }
+}
+
+exports.subscribeStudent = (req, res) => {
+    Student.findByIdAndUpdate(req.body.studentId, {$set: {isSubscribed: true}}, {new: true}).exec((err, success) => {
         if (err || !success) {
             res.send({
                 message: "Something went wrong. Can't update Please try again",
@@ -255,11 +370,49 @@ exports.subscribeStudent = (req, res) => {
             success
         })
     }) 
+    // const {studentId, registeredId} = req.body
+    // let uu_Id = uuidv4()
+
+    // // var PaytmChecksum = require("./PaytmChecksum");
+    // const totalAmount = 1;
+    // var paytmParams = {};
+
+    // /* initialize an array */
+    // paytmParams["MID"] = process.env.TEST_MERCHANT_ID_P;
+    // paytmParams["ORDER_ID"] = uu_Id;
+    // paytmParams['WEBSITE'] = process.env.WEBSITE_P,
+    // paytmParams["INDUSTRY_TYPE_ID"] = process.env.INDUSTRY_TYPE_P,
+    // paytmParams['CHANNEL_ID'] = process.env.CHANNEL_ID_P,
+    // paytmParams['CALLBACK_URL'] = `http://localhost:8000/api/payment-callback`,
+    // paytmParams['CUST_ID'] = studentId,
+    // paytmParams['MOBILE_NO'] = '1111111111',
+    // paytmParams['EMAIL'] = 'mp06121@gmail.com',
+    // paytmParams['TXN_AMOUNT'] = totalAmount,
+    // paytmParams['ORDER_DATA'] = 'Data'
+
+    //     /**
+    //      * Generate checksum by parameters we have
+    //      * Find your Merchant Key in your Paytm Dashboard at https://dashboard.paytm.com/next/apikeys 
+    //      */
+    // // console.log(paytmParams)
+    // var paytmChecksum = PaytmChecksum.generateSignature(paytmParams, process.env.TEST_MERCHANT_KEY_P);
+    // paytmChecksum.then(function(checksum){
+    //     console.log("generateSignature Returns: " + checksum);
+    //     let paytmResponse = {
+    //         ...paytmParams,
+    //         "CHECKSUMHASH": checksum,
+    //         "ORDER_DATA": 'Data'
+    //     }
+    //     console.log(paytmResponse)
+    //     res.json(paytmResponse)
+    // }).catch(function(error){
+    //     console.log("ERROR", error);
+    // });
 }
 
 exports.getCenterAdmin = (req, res) => {
     const {subcId} = req.params
-    console.log(subcId)
+    // console.log(subcId)
     Center.findById(subcId)
     .populate('assignedTo')
     .populate('createdBy').exec((err, center) => {
@@ -269,7 +422,7 @@ exports.getCenterAdmin = (req, res) => {
                 err
             })
         } else {
-            console.log(center._id)
+            // console.log(center._id)
             Student.find({registeredBy: center._id}).exec((err, students) => {
                 if (err || !students) {
                     res.send({
@@ -319,7 +472,7 @@ exports.getCourses = (req, res) => {
 }
 
 exports.registerCenterUser = (req, res) => {
-    console.log(req.body)
+    // console.log(req.body)
     if (req.body.role === 1) {
         CenterUser.findOne({ownerEmail: req.body.ownerEmail})
         .populate('registeredBy', '_id firstName middleName lastName')
@@ -368,4 +521,77 @@ exports.updateSubUser = (req, res) => {
             })
         }
     })
+}
+
+exports.updateStuCourse = (req, res) => {
+    Student.updateOne({_id: req.body.studentId}, 
+        {$set:{selectedCourse: req.body.newCourse}}, {new: true}).exec((err, success) => {
+            if(err || !success) {
+                res.status(400).send({
+                    error: "Something went wrong"
+                })
+            } else {
+                res.json(success)
+            }
+    })
+}
+
+exports.initiatePayment = (req, res) => {
+	try {
+		const instance = new Razorpay({
+			key_id: process.env.KEY_ID,
+			key_secret: process.env.KEY_SECRET,
+		});
+
+		const options = {
+			amount: req.body.amount * 100,
+			currency: "INR",
+			receipt: crypto.randomBytes(10).toString("hex"),
+		};
+
+		instance.orders.create(options, (error, order) => {
+			if (error) {
+				console.log(error);
+				return res.status(500).json({ message: "Something Went Wrong!" });
+			}
+			res.status(200).json({ data: order });
+		});
+	} catch (error) {
+		res.status(500).json({ message: "Internal Server Error!" });
+		console.log(error);
+	}
+}
+
+exports.verifypayment = (req, res) => {
+    try {
+		const { razorpay_order_id, razorpay_payment_id, razorpay_signature } =
+			req.body;
+        console.log(req.params.studentId)
+		const sign = razorpay_order_id + "|" + razorpay_payment_id;
+		const expectedSign = crypto
+			.createHmac("sha256", process.env.KEY_SECRET)
+			.update(sign.toString())
+			.digest("hex");
+
+		if (razorpay_signature === expectedSign) {
+            Student.findByIdAndUpdate(req.params.studentId, {$set: {isSubscribed: true}}, {new: true}).exec((err, success) => {
+                if (err || !success) {
+                    res.send({
+                        message: "Something went wrong. Can't update Please try again",
+                        err
+                    })
+                }
+                res.send({
+                    updated: true,
+                    success
+                })
+            }) 
+			// return res.status(200).json({ message: "Payment verified successfully" });
+		} else {
+			return res.status(400).json({ message: "Invalid signature sent!" });
+		}
+	} catch (error) {
+		res.status(500).json({ message: "Internal Server Error!" });
+		console.log(error);
+	}
 }

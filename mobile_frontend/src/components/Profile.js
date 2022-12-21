@@ -1,7 +1,11 @@
-import {useEffect, useState} from 'react';
-import {Button, ScrollView, View} from 'react-native';
+import {useEffect, useState, useCallback} from 'react';
+import {Button, ScrollView, View, RefreshControl} from 'react-native';
 import { Text } from '@rneui/base';
 import {useAuth} from '../contexts/Auth';
+
+const wait = (timeout) => {
+    return new Promise(resolve => setTimeout(resolve, timeout));
+}
 
 export const Profile = ({navigation}) => {
 
@@ -11,13 +15,20 @@ export const Profile = ({navigation}) => {
     const signOut = () => {
         auth.signOut();
     };
-
+    const [refreshing, setRefreshing] = useState(false);
     const [testData, setTestData] = useState(null)
     // const [testRawData, setTestRawData] = useState({})
 
     useEffect(() => {
         getResults()
+        onRefresh()
     }, [])
+
+    const onRefresh = useCallback(() => {
+        setRefreshing(true);
+        getResults()
+        wait(1000).then(() => setRefreshing(false));
+    }, []);
 
     const getResults = (studentId = auth.authData.user._id) => {
         fetch(`http://localhost:8000/api/get-student-results/${studentId}`, {
@@ -28,7 +39,7 @@ export const Profile = ({navigation}) => {
             }
         }).then(res => {
             res.json().then(text => {
-                setTestData(text)
+                setTestData(text.reverse())
                 // setTestRawData(text.testRawData)
             })
         })
@@ -45,7 +56,7 @@ export const Profile = ({navigation}) => {
                 }}>
                     <Text h4>Name: {user.user.firstName} {user.user.lastName}</Text>
                     <Text h4>Email: {user.user.email}</Text>
-                    <Text h4>Mb: {user.user.mobileNumber}</Text>
+                    <Text h4>Mob: {user.user.mobileNumber}</Text>
                     <Text h4>Status: {user.user.isSubscribed ? <Text>Subscribed</Text> : <Text>Not Subscribed</Text>}</Text>
                 </View>
                 {user.user.isSubscribed ? <View style={{
@@ -69,7 +80,12 @@ export const Profile = ({navigation}) => {
                 <View style={{
                     flex: 1
                 }}>
-                    <ScrollView>
+                    <ScrollView
+                        refreshControl={
+                            <RefreshControl
+                            refreshing={refreshing}
+                            onRefresh={onRefresh}
+                            />}>
                         {testData === null ? null : 
                         (testData.map((data, i) => (
                             <View key={i} style={{

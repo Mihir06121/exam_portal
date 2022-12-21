@@ -73,19 +73,19 @@ const AuthProvider = ({ children }) => {
         })
     }
 
-    const signOut = async () => {
+    const signOut = () => {
         //Remove data from context, so the App can be notified
         //and send the user to the AuthStack
         setAuthData(undefined);
-        setQuestions(null)
+        // setQuestions(null)
         //Remove the data from Async Storage
         //to NOT be recoverede in next session.
-        await AsyncStorage.removeItem('@AuthData');
+        AsyncStorage.removeItem('@AuthData');
     };
     return (
     //This component will be used to encapsulate the whole App,
     //so all components will have access to the Context
-    React.createElement(AuthContext.Provider, { value: { authData, questions, loading, signIn, signOut, getQuestionsForStudent } }, children));
+    React.createElement(AuthContext.Provider, { value: { authData, questions, loading, signIn, getQuestionsForStudent, signOut } }, children));
 };
 //A simple hooks to facilitate the access to the AuthContext
 // and permit components to subscribe to AuthContext updates

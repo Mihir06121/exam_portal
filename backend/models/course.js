@@ -8,6 +8,14 @@ const courseSchema = new mongoose.Schema({
     courseType: {
         type: String,
         required: true
+    },
+    examDuration: {
+        type: String,
+        required: true
+    },
+    coursePrice: {
+        type: String,
+        required: true
     }
 }, {timestamps: true})
 

@@ -74,7 +74,6 @@ export const updateSubCenter = (data) => {
 }
 
 export const getUserCenter = async (userId) => {
-    console.log(userId)
     return await fetch(`http://localhost:8000/api/get-user-center/${userId}`, {
         method: 'GET',
         headers: {
@@ -140,6 +139,7 @@ export const subscribeStudent = (data) => {
         },
         body: JSON.stringify(data)
     }).then(response => {
+        localStorage.setItem('response', JSON.stringify(response));
         return response.json()
     }).catch(err => {
         console.log(err)

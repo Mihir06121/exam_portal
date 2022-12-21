@@ -15,7 +15,11 @@ const {createCenter,
     createAdminCourse,
     getCourses,
     updateSubUser,
-    registerCenterUser} = require('../controllers/center')
+    updateStuCourse,
+    registerCenterUser,
+    initiatePayment,
+getResponse,
+verifypayment} = require('../controllers/center')
 
 router.post('/create-center', createCenter)
 router.get('/get-users-for-center/:userRole', getUserForCenter)
@@ -27,10 +31,14 @@ router.put('/update-sub-center', updateSubCenter)
 router.post('/register-student', registerStudent)
 router.get('/get-center-students/:centerId', getCenterStudents)
 router.put('/subscribe-student', subscribeStudent)
+router.patch('/update-student-course', updateStuCourse)
 router.get('/get-center-admin/:subcId', getCenterAdmin)
 router.post('/create-course', createAdminCourse)
 router.get('/get-courses', getCourses)
 router.post('/register-center-user', registerCenterUser)
 router.put('/update-sub-user', updateSubUser)
+router.post('/payment-callback', getResponse)
+router.post('/payment/orders', initiatePayment)
+router.post('/payment/verify/:studentId', verifypayment)
 
 module.exports = router

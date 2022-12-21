@@ -57,8 +57,8 @@ exports.postResults = (req, res) => {
                     isSubscribed: true, 
                     appeard: false,
                     completed: false
-                }}, {new: true}).exec((err, success) => {
-                    if (err || !success) {
+                }}, {new: true}).exec((err, updatedSuccess) => {
+                    if (err || !updatedSuccess) {
                         res.send({
                             message: "Something went wrong. Can't update Please try again",
                             err
@@ -66,6 +66,7 @@ exports.postResults = (req, res) => {
                     }
                     res.send({
                         updated: true,
+                        updatedSuccess,
                         success
                     })
                 }) 
