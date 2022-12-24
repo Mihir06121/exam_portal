@@ -5,6 +5,7 @@ import {useAuth} from '../contexts/Auth';
 import { useEffect, useState, useRef } from "react";
 import { CountdownCircleTimer } from 'react-native-countdown-circle-timer'
 // import CountDown from 'react-native-countdown-component';
+import moment from 'moment'
 
 export const QuestionScreen = ({navigation}) => {
 
@@ -24,8 +25,9 @@ export const QuestionScreen = ({navigation}) => {
     }
 
     const studentId = auth.authData.user._id
-    const course= quest[0].course
-
+    const course= quest[0].course._id
+    const examDuration = quest[0].course.examDuration
+    // console.log(quest)
     useEffect(() => {
         createSudoArray(quest)
     }, [])
@@ -125,13 +127,21 @@ export const QuestionScreen = ({navigation}) => {
         }).then( res => {
             res.json().then(text => {
                 if (text.updated === true) {
-                    return navigation.navigate('Home_Screen')
-                }
+                    // return navigation.navigate('Home_Screen')
+                return auth.signOut()
+            }
             })
         }).catch(err => {
             console.log(err)
         })
     }
+
+    const displayTime = (remainingTime) => {
+        const any=moment.duration(remainingTime, 'seconds');
+        const data=any._data
+        return `${data.minutes}: ${data.seconds}`
+    }
+
     return (
         <View style={{flex:1}}>
             <View style={{alignSelf: "center"}}>
@@ -141,11 +151,11 @@ export const QuestionScreen = ({navigation}) => {
                     size={50}
                     strokeWidth={5}
                     onComplete={() => handleSubmit({sudoData, studentId, course})}
-                    duration={10}
+                    duration={examDuration}
                     colors={['#004777', '#F7B801', '#A30000', '#A30000']}
                     colorsTime={[10, 5, 2, 0]}
                 >
-                    {({ remainingTime }) => <Text>{remainingTime}</Text>}
+                    {({ remainingTime }) => <Text>{displayTime(remainingTime)}</Text>}
                 </CountdownCircleTimer>
             </View>
             <View style={{

@@ -10,7 +10,8 @@ const wait = (timeout) => {
 export const Profile = ({navigation}) => {
 
     const auth = useAuth();
-
+    const quest = auth.questions
+    // console.log(quest[0].course.examDuration)
     const user = auth.authData
     const signOut = () => {
         auth.signOut();
@@ -62,9 +63,12 @@ export const Profile = ({navigation}) => {
                 {user.user.isSubscribed ? <View style={{
                     paddingVertical: 10
                 }}>
+                    {quest === null ? <Text style={{
+                        alignSelf: 'center'
+                    }}>NO QUESTIONS ADDED</Text>:
                     <Button
                     onPress={() => navigation.navigate('Questions')}
-                    title="Appear for exam"/>
+                    title="Appear for exam"/> }
                 </View> : <View>
                 </View>}
                     <Button title="Sign Out" color={"red"} onPress={signOut} />

@@ -33,7 +33,9 @@ exports.studentLogin = (req, res) => {
 }
 
 exports.getQuestionsForStudent = (req, res) => {
-    Questions.find({course:req.params.courseId}).exec((err, questions) => {
+    Questions.find({course:req.params.courseId})
+    .populate({ path: 'course', model: Courses })
+    .exec((err, questions) => {
         if (err || !questions) {
             return res.status(400).send({
                 error: 'No Question Found'
